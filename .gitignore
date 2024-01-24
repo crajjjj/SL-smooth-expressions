@@ -1,5 +1,12 @@
-*
+# ignore everything (dirs, files, sub-dirs, sub-files)
+/*
 !.gitignore
-!scripts/Source/sslBaseExpression.psc
+!/scripts
+/scripts/*
 !scripts/sslBaseExpression.pex
-!Build/**
+
+!/Source
+!/Build
+
+!LICENSE
+!README.md
