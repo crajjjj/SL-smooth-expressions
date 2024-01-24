@@ -242,6 +242,17 @@ function ApplyPresetFloats(Actor ActorRef, float[] Preset) global
 	; MFG
 	bool IsMouthOpen = IsMouthOpen(ActorRef)
 	bool HasMFG = SexLabUtil.GetConfig().HasMFGFix
+	; Set expression
+	float currExpr = GetExpression(ActorRef, true)
+	float currExprStr = GetExpression(ActorRef, false)
+	if !IsMouthOpen
+		if currExpr != Preset[30]
+			SmoothSetExpression(ActorRef, currExpr as int, 0, 0)
+			SmoothSetExpression(ActorRef, Preset[30] as int, (Preset[31] * 100.0) as int, 0)
+		ElseIf (currExpr == Preset[30] && currExprStr != Preset[31])
+			SmoothSetExpression(ActorRef, currExpr as int, (Preset[31] * 100.0) as int, (currExprStr * 100) as int)
+		endIf
+	endIf
 	; Set Phoneme
 	if IsMouthOpen
 		i = 16 ; escape the Phoneme to prevent override the MouthOpen
@@ -291,10 +302,6 @@ function ApplyPresetFloats(Actor ActorRef, float[] Preset) global
 		i += 1
 		m += 1
 	endWhile
-	; Set expression
-	if (GetExpression(ActorRef, true) == Preset[30] || GetExpression(ActorRef, false) != Preset[31]) && !IsMouthOpen
-		SmoothSetExpression(ActorRef,Preset[30] as int, (Preset[31] * 100.0) as int)
-	endIf
 endFunction
 
 
