@@ -1,0 +1,5 @@
+*
+!.gitignore
+!scripts/Source/sslBaseExpression.psc
+!scripts/sslBaseExpression.pex
+!Build/**
