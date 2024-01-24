@@ -1,6 +1,7 @@
 scriptname sslBaseExpression extends sslBaseObject
 
 ;import PapyrusUtil
+import sslExpression_util
 
 ; Gender Types
 int property Male       = 0 autoreadonly
@@ -41,6 +42,9 @@ endProperty
 Form[] MaleEquip
 Form[] FemaleEquip
 
+int[] MaleLipFixed
+int[] FemaleLipFixed
+
 float[] Male1
 float[] Male2
 float[] Male3
@@ -62,9 +66,31 @@ function Apply(Actor ActorRef, int Strength, int Gender)
 endFunction
 
 function ApplyPhase(Actor ActorRef, int Phase, int Gender)
+	if !ActorRef
+		return
+	endIf
+
 	if Phase <= Phases[Gender]
-	;	TransitPresetFloats(ActorRef, GetCurrentMFG(ActorRef), GenderPhase(Phase, Gender)) 
-		ApplyPresetFloats(ActorRef, GenderPhase(Phase, Gender))
+		Form akWorn = ActorRef.GetWornForm(0x80000000)
+		Form akItem
+		if !IsLipFixedPhase(Phase, Gender) || !IsMouthOpen(ActorRef)
+			akItem = GetEquipmentPhase(Phase, Gender)
+		endIf
+
+		if !akItem
+			if akWorn
+				UnequipFaceItem(ActorRef, akWorn)
+				Form EmptyItem = Game.GetFormFromFile(0x8FC65, "SexLab.esm") ; SexLabFaceItemEmpty "Empty" [ARMO:0808FC65]
+				If EmptyItem && EmptyItem.GetType() == 26 && EmptyItem != akWorn && ActorRef.GetItemCount(EmptyItem) > 0
+					ActorRef.EquipItem(EmptyItem, false, true)
+				EndIf
+			endIf
+		endIf
+
+		;	TransitPresetFloats(ActorRef, GetCurrentMFG(ActorRef), GenderPhase(Phase, Gender)) 
+			ApplyPresetFloats(ActorRef, GenderPhase(Phase, Gender))
+
+			EquipFaceItem(ActorRef, akItem)
 	endIf
 endFunction
 
@@ -74,7 +100,7 @@ endFunction
 
 float[] function SelectPhase(int Strength, int Gender)
 	return GenderPhase(PickPhase(Strength, Gender), Gender)
-endFunction 
+endFunction
 
 ; ------------------------------------------------------- ;
 ; --- Global Utilities                                --- ;
@@ -130,6 +156,10 @@ function ClearModifier(Actor ActorRef) global
 endFunction
 
 function OpenMouth(Actor ActorRef) global
+	OpenMouthScaled(ActorRef, 1.0)
+endFunction
+
+function OpenMouthScaled(Actor ActorRef, float Scale = 1.0) global
 ;	ClearPhoneme(ActorRef)
 ;	if SexLabUtil.GetConfig().HasMFGFix
 ;		MfgConsoleFunc.SetPhonemeModifier(ActorRef, 0, 1, SexLabUtil.GetConfig().OpenMouthSize) 
@@ -138,31 +168,46 @@ function OpenMouth(Actor ActorRef) global
 ;	endIf
 	bool isRealFemale = ActorRef.GetLeveledActorBase().GetSex() == 1
 	int OpenMouthExpression = SexLabUtil.GetConfig().GetOpenMouthExpression(isRealFemale)
-	int OpenMouthSize = SexLabUtil.GetConfig().OpenMouthSize
 	float[] Phonemes = SexLabUtil.GetConfig().GetOpenMouthPhonemes(isRealFemale)											 
 	Int i = 0
 	Int s = 0
+	Int value
 	bool HasMFG = SexLabUtil.GetConfig().HasMFGFix
+	int MouthScale = (StorageUtil.GetFloatValue(ActorRef, "SexLab.MouthScale", 1.0) * Scale * 100) as Int
+	if MouthScale < 20
+		MouthScale = 20
+	ElseIf MouthScale > 200
+		MouthScale = 200
+	EndIf
+	; Set expression
+	value = PapyrusUtil.ClampInt((MouthScale * (SexLabUtil.GetConfig().OpenMouthSize as float / 100.0)) as int, 0, 100)
+	if (GetExpression(ActorRef, true) as int != OpenMouthExpression || GetExpression(ActorRef, false) != value as float / 100.0)
+		SmoothSetExpression(ActorRef, OpenMouthExpression, value)
+	endIf
+	; Set Phoneme
+	Bool PhonemeUpdated = false
 	while i < Phonemes.length
-		if (GetPhoneme(ActorRef, i) != Phonemes[i])
+		value = PapyrusUtil.ClampInt((MouthScale * Phonemes[i]) as int, 0, 100)
+		if (GetPhoneme(ActorRef, i) != value as float / 100.0)
 			if HasMFG
-				SmoothSetModifier(ActorRef,0,-1,PapyrusUtil.ClampInt((OpenMouthSize * Phonemes[i]) as int, 0, 100))
+				SmoothSetModifier(ActorRef,0,-1,value)
 			else
-				ActorRef.SetExpressionPhoneme(i, PapyrusUtil.ClampInt((OpenMouthSize * Phonemes[i]) as int, 0, 100) as float / 100.0)
+				ActorRef.SetExpressionPhoneme(i, value as float / 100.0)
 			endIf
+			PhonemeUpdated = True
 		endIf
 		if Phonemes[i] >= Phonemes[s] ; seems to be required to prevet issues
 			s = i
 		endIf
 		i += 1
 	endWhile
-	if HasMFG
-		SmoothSetPhoneme(ActorRef, s, (Phonemes[s] * 100.0) as int) ; Oldrim
-	else
-		ActorRef.SetExpressionPhoneme(s, Phonemes[s]) ; is supouse to be / 100.0 already thanks SetIndex function
-	endIf
-	if (GetExpression(ActorRef, true) as int == OpenMouthExpression || GetExpression(ActorRef, false) != OpenMouthSize as float / 100.0)
-		SmoothSetExpression(ActorRef,OpenMouthExpression, OpenMouthSize, GetExpression(ActorRef,true) as Int)
+	if PhonemeUpdated
+		value = PapyrusUtil.ClampInt((MouthScale * Phonemes[s]) as int, 0, 100)
+		if HasMFG
+			SmoothSetPhoneme(ActorRef, s, value) ; Oldrim
+		else
+			ActorRef.SetExpressionPhoneme(s, value as float / 100.0) 
+		endIf
 	endIf
 	Utility.WaitMenuMode(0.1)
 endFunction
@@ -175,16 +220,16 @@ endFunction
 
 bool function IsMouthOpen(Actor ActorRef) global
 	bool isRealFemale = ActorRef.GetLeveledActorBase().GetSex() == 1
+	int MinMouthScale = 20
 	int OpenMouthExpression = SexLabUtil.GetConfig().GetOpenMouthExpression(isRealFemale)
-	float MinMouthSize = (SexLabUtil.GetConfig().OpenMouthSize * 0.01) - 0.1
 ;	return GetPhoneme(ActorRef, 1) >= MinMouthSize && (GetExpression(ActorRef, true) as Int == OpenMouthExpression && GetExpression(ActorRef, false) >= MinMouthSize)
-	if GetExpression(ActorRef, true) as Int == OpenMouthExpression && GetExpression(ActorRef, false) >= MinMouthSize
+	if GetExpression(ActorRef, true) as Int == OpenMouthExpression && GetExpression(ActorRef, false) >= (MinMouthScale * (SexLabUtil.GetConfig().OpenMouthSize as float / 100.0))
 		return true
 	endIf
 	float[] Phonemes = SexLabUtil.GetConfig().GetOpenMouthPhonemes(isRealFemale)											 
 	Int i = 0
 	while i < Phonemes.length
-		if (GetPhoneme(ActorRef, i) < (MinMouthSize * Phonemes[i]))
+		if (GetPhoneme(ActorRef, i) < (MinMouthScale * Phonemes[i]) / 100)
 			return false
 		endIf
 		i += 1
@@ -193,10 +238,10 @@ bool function IsMouthOpen(Actor ActorRef) global
 endFunction
 
 function ClearMFG(Actor ActorRef) global
+	ActorRef.ClearExpressionOverride()
 	if SexLabUtil.GetConfig().HasMFGFix
 		resetMFGSmooth(ActorRef)
 	else
-		ActorRef.ClearExpressionOverride()
 		ClearPhoneme(ActorRef)
 		ClearModifier(ActorRef)
 	endIf
@@ -238,21 +283,36 @@ function ApplyPresetFloats(Actor ActorRef, float[] Preset) global
 	int i
 	int p
 	int m
+	int value
 	; MFG
 	bool IsMouthOpen = IsMouthOpen(ActorRef)
 	bool HasMFG = SexLabUtil.GetConfig().HasMFGFix
+	int MouthScale = (StorageUtil.GetFloatValue(ActorRef, "SexLab.MouthScale", 1.0) * 100) as Int
+	if MouthScale < 20
+		MouthScale = 20
+	ElseIf MouthScale > 200
+		MouthScale = 200
+	EndIf
+	; Set expression
+	value = PapyrusUtil.ClampInt((MouthScale * Preset[31]) as int, 0, 100)
+	If (GetExpression(ActorRef, true) != Preset[30] || GetExpression(ActorRef, false) != value as Float / 100.0) && !IsMouthOpen
+		SmoothSetExpression(ActorRef, Preset[30] as int, value)
+	endIf
 	; Set Phoneme
 	if IsMouthOpen
 		i = 16 ; escape the Phoneme to prevent override the MouthOpen
 	else
-		int s
+		int s = 0
+		Bool PhonemeUpdated = False
 		while p <= 15
-			if GetPhoneme(ActorRef, p) != Preset[i]
+			value = PapyrusUtil.ClampInt((MouthScale * Preset[i]) as int, 0, 100)
+			if GetPhoneme(ActorRef, p) != value as float / 100.0
 				if HasMFG
 					SmoothSetPhoneme(ActorRef, p, (Preset[i] * 100.0) as int) ; Oldrim
 				else
-					ActorRef.SetExpressionPhoneme(p, Preset[i]) ; is supouse to be / 100.0 already thanks SetIndex function
+					ActorRef.SetExpressionPhoneme(p, value as float / 100.0)
 				endIf
+				PhonemeUpdated = True
 			endIf
 			if Preset[p] >= Preset[s] ; seems to be required to prevet issues
 				s = p
@@ -260,10 +320,13 @@ function ApplyPresetFloats(Actor ActorRef, float[] Preset) global
 			i += 1
 			p += 1
 		endWhile
-		if HasMFG
-			SmoothSetPhoneme(ActorRef, s, (Preset[s] * 100.0) as int) ; Oldrim
-		else
-			ActorRef.SetExpressionPhoneme(s, Preset[s]) ; is supouse to be / 100.0 already thanks SetIndex function
+		if PhonemeUpdated
+			value = PapyrusUtil.ClampInt((MouthScale * Preset[s]) as int, 0, 100)
+			if HasMFG
+				SmoothSetPhoneme(ActorRef,s,value)
+			else
+				ActorRef.SetExpressionPhoneme(s, value as float / 100.0) 
+			endIf
 		endIf
 		
 	endIf
@@ -290,12 +353,7 @@ function ApplyPresetFloats(Actor ActorRef, float[] Preset) global
 		i += 1
 		m += 1
 	endWhile
-	; Set expression
-	if (GetExpression(ActorRef, true) == Preset[30] || GetExpression(ActorRef, false) != Preset[31]) && !IsMouthOpen
-		SmoothSetExpression(ActorRef,Preset[30] as int, (Preset[31] * 100.0) as int, 0)
-	endIf
 endFunction
-
 
 float[] function GetCurrentMFG(Actor ActorRef) global
 	float[] Preset = new float[32]
@@ -320,6 +378,187 @@ float[] function GetCurrentMFG(Actor ActorRef) global
 	return Preset
 endFunction
 
+int function GetLipFixedPhase(int Phase, int Gender)
+	if Phase > 0 && Phase <= 5 
+		if Gender == Male
+			If !MaleLipFixed || MaleLipFixed.Length != 5
+				MaleLipFixed = new int[5]
+			EndIf
+			return MaleLipFixed[Phase - 1]
+		else
+			If !FemaleLipFixed || FemaleLipFixed.Length != 5
+				FemaleLipFixed = new int[5]	; Fix for external expressions like in the zbfSexLab
+			EndIf
+			return FemaleLipFixed[Phase - 1]
+		endIf
+	endIf
+	return 0
+endFunction
+
+function SetLipFixedPhase(int Phase, int Gender, int value)
+	if Phase > 0 && Phase <= 5 
+		if Gender == Male || Gender == MaleFemale
+			If !MaleLipFixed || MaleLipFixed.Length != 5
+				MaleLipFixed = new int[5]	; Fix for external expressions like in the zbfSexLab
+			EndIf
+			MaleLipFixed[Phase - 1] = value
+		endIf
+		if Gender == Female || Gender == MaleFemale
+			If !FemaleLipFixed || FemaleLipFixed.Length != 5
+				FemaleLipFixed = new int[5]
+			EndIf
+			FemaleLipFixed[Phase - 1] = value
+		endIf
+	endIf
+endFunction
+
+int[] function GetLipFixedValues(int Gender)
+	int[] Output = new int[5]
+	int i = Output.Length
+	while i
+		i -= 1
+		Output[i] = GetLipFixedPhase(i + 1, Gender)
+	endWhile
+	return Output
+endFunction
+
+function SetLipFixedValues(int Gender, int[] values)
+	if values && values.Length <= 5 
+		int i = values.Length
+		while i
+			i -= 1
+			SetLipFixedPhase(i + 1, Gender, values[i]) 
+		endWhile
+	endIf
+endFunction
+
+bool function IsLipFixedPhase(int Phase, int Gender)
+	return GetLipFixedPhase(Phase, Gender) > 0
+endFunction
+
+Form function GetEquipmentPhase(int Phase, int Gender)
+	if Phase > 0 && Phase <= 5 
+		if Gender == Male
+			return MaleEquip[Phase - 1]
+		else
+			return FemaleEquip[Phase - 1]
+		endIf
+	endIf
+	return none
+endFunction
+
+function SetEquipmentPhase(int Phase, int Gender, Form akItem)
+	if Phase > 0 && Phase <= 5 
+		if Gender == Male || Gender == MaleFemale
+			MaleEquip[Phase - 1] = akItem
+		endIf
+		if Gender == Female || Gender == MaleFemale
+			FemaleEquip[Phase - 1] = akItem
+		endIf
+	endIf
+endFunction
+
+Form[] function GetEquipments(int Gender)
+	Form[] Output = new Form[5]
+	int i = Output.Length
+	while i
+		i -= 1
+		Output[i] = GetEquipmentPhase(i + 1, Gender)
+	endWhile
+	return Output
+endFunction
+
+function SetEquipments(int Gender, Form[] akItems)
+	if akItems && akItems.Length <= 5 
+		int i = akItems.Length
+		while i
+			i -= 1
+			SetEquipmentPhase(i + 1, Gender, akItems[i]) 
+		endWhile
+	endIf
+endFunction
+
+Form function GetEquipmentByStrength(int Strength, int Gender)
+	return GetEquipmentPhase(PickPhase(Strength, Gender), Gender)
+endFunction
+
+function SetEquipmentByStrength(int Strength, int Gender, Form akItem)
+	SetEquipmentPhase(PickPhase(Strength, Gender), Gender, akItem)
+endFunction
+
+function EquipFaceItem(Actor ActorRef, Form akItem) global
+	if !ActorRef || !akItem
+		return
+	endIf
+
+	armor akArmor = akItem as Armor
+	if akArmor && Math.LogicalAnd(akArmor.GetSlotMask(), 0x80000000) == 0x80000000 && ActorRef.GetItemCount(akItem) > 0
+		if !ActorRef.IsEquipped(akItem)
+			ActorRef.EquipItem(akItem, false, true)
+			Debug.Trace("SEXLAB - EquipFaceItem("+akItem+") ItemSlotMask:"+akArmor.GetSlotMask()+" - "+ 0x80000000)
+			Utility.Wait(0.1)
+			if Game.GetCameraState() && !ActorRef.IsOnMount()
+			;	if ActorRef == Game.GetPlayer()
+					Game.UpdateThirdPerson()
+			;	endif
+				Utility.Wait(0.1)
+			endif
+			ActorRef.EquipItem(akItem, false, true)
+		Else
+			ActorRef.EquipItem(akItem, false, true)
+			Debug.Trace("SEXLAB - EquipFaceItem("+akItem+") ItemSlotMask:"+akArmor.GetSlotMask()+" - "+ 0x80000000)
+		endif
+	endIf
+endFunction
+
+function UnequipWornFaceItem(Actor ActorRef, sslBaseExpression oldExpression, sslBaseExpression newExpression = none) global
+	if !ActorRef || !oldExpression
+		return
+	endIf
+
+	if oldExpression != newExpression
+		Form akWorn = ActorRef.GetWornForm(0x80000000)
+		int Gender = ActorRef.GetLeveledActorBase().GetSex()
+		if akWorn && oldExpression.GetEquipments(Gender).Find(akWorn) != -1 ;&& (!newExpression || newExpression.GetEquipments(Gender).Find(akWorn) == -1)
+			UnequipFaceItem(ActorRef, akWorn)
+		;	ActorRef.RemoveItem(akWorn, 1, true)
+		endIf
+	endIf
+endFunction
+
+function UnequipFaceItem(Actor ActorRef, Form akItem = none) global
+	if !ActorRef
+		return
+	endIf
+
+	Form akWorn
+	if akItem
+		armor akArmor = akItem as Armor
+		if akArmor && Math.LogicalAnd(akArmor.GetSlotMask(), 0x80000000) == 0x80000000
+			akWorn = akItem
+		endIf
+	else
+		akWorn = ActorRef.GetWornForm(0x80000000)
+	endif
+	if akWorn
+		Form[] TempFaceItems = SexLabUtil.GetConfig().GetFaceItems()
+		if !TempFaceItems || TempFaceItems.Find(akWorn) != -1
+			int i = 25
+			while i && ActorRef.IsEquipped(akWorn)
+				ActorRef.UnequipItem(akWorn, false, true)
+				Utility.Wait(0.1)
+				i -= 1
+			endWhile
+			if Game.GetCameraState() && !ActorRef.IsOnMount()
+			;	if ActorRef == Game.GetPlayer()
+					Game.UpdateThirdPerson()
+			;	endif
+				Utility.Wait(0.1)
+			endif
+		endif
+	endif
+endFunction
+
 ; ------------------------------------------------------- ;
 ; --- Editing Functions                               --- ;
 ; ------------------------------------------------------- ;
@@ -335,6 +574,8 @@ function SetIndex(int Phase, int Gender, int Mode, int id, int value)
 	Preset[i] = value as float
 	if i != 30
 		Preset[i] = Preset[i] / 100.0
+	else
+		Preset[i] = PapyrusUtil.ClampInt(Preset[i] as int, 0, 16) as float
 	endIf
 	SetPhase(Phase, Gender, Preset)
 endFunction
@@ -350,6 +591,9 @@ function SetPreset(int Phase, int Gender, int Mode, int id, int value)
 endFunction
 
 function SetMood(int Phase, int Gender, int id, int value)
+	if id < 1 ; 0 - Dialogue Anger cause errors on the SSE version of SetExpressionOverride()
+		id = 8 ; 8 - Mood Anger
+	endIf
 	if Gender == Female || Gender == MaleFemale
 		SetIndex(Phase, Female, Mood, 0, id)
 		SetIndex(Phase, Female, Mood, 1, value)
@@ -439,7 +683,7 @@ float[] function GenderPhase(int Phase, int Gender)
 		endIf
 	endIf
 	if Preset.Length != 32
-		return new float[32]
+		return Utility.ResizeFloatArray(Preset, 32, 0.0)
 	endIf
 	return Preset
 endFunction
@@ -595,9 +839,7 @@ endFunction
 function Initialize()
 	; Gender phase counts
 	Phases = new int[2]
-	; Extra phase equips
-	MaleEquip   = new Form[5]
-	FemaleEquip = new Form[5]
+
 	; Individual Phases
 	Male1   = Utility.CreateFloatArray(0)
 	Male2   = Utility.CreateFloatArray(0)
@@ -609,6 +851,12 @@ function Initialize()
 	Female3 = Utility.CreateFloatArray(0)
 	Female4 = Utility.CreateFloatArray(0)
 	Female5 = Utility.CreateFloatArray(0)
+	; Extra effects
+	MaleEquip   = new Form[5]
+	FemaleEquip = new Form[5]
+	MaleLipFixed   = new int[5]
+	FemaleLipFixed = new int[5]
+
 	parent.Initialize()
 endFunction
 
@@ -622,6 +870,8 @@ bool function ExportJson()
 	JsonUtil.SetIntValue(File, "Victim", HasTag("Victim") as int)
 	JsonUtil.SetIntValue(File, "Aggressor", HasTag("Aggressor") as int)
 
+	JsonUtil.StringListCopy(File, "Tags", GetTags())
+
 	JsonUtil.FloatListCopy(File, "Male1", Male1)
 	JsonUtil.FloatListCopy(File, "Male2", Male2)
 	JsonUtil.FloatListCopy(File, "Male3", Male3)
@@ -633,6 +883,11 @@ bool function ExportJson()
 	JsonUtil.FloatListCopy(File, "Female4", Female4)
 	JsonUtil.FloatListCopy(File, "Female5", Female5)
 
+	JsonUtil.FormListCopy(File, "MaleEquip", MaleEquip)
+	JsonUtil.FormListCopy(File, "FemaleEquip", FemaleEquip)
+	JsonUtil.IntListCopy(File, "MaleLipFixed", MaleLipFixed)
+	JsonUtil.IntListCopy(File, "FemaleLipFixed", FemaleLipFixed)
+	
 	return JsonUtil.Save(File, true)
 endFunction
 
@@ -649,79 +904,107 @@ bool function ImportJson()
 	AddTagConditional("Victim", JsonUtil.GetIntValue(File, "Victim", HasTag("Victim") as int) as bool)
 	AddTagConditional("Aggressor", JsonUtil.GetIntValue(File, "Aggressor", HasTag("Aggressor") as int) as bool)
 
+	string[] currentTags = GetTags()
+	int i = currentTags.Length
+	While i > 0
+		i -= 1
+		RemoveTag(currentTags[i])
+	EndWhile
+	AddTags(JsonUtil.StringListToArray(File, "Tags"))
+
 	if JsonUtil.FloatListCount(File, "Male1") == 32
 		Male1 = new float[32]
 		JsonUtil.FloatListSlice(File, "Male1", Male1)
-		if Male1[30] > 14 ; Prevent issues with OpenMouth
-			Male1[30] = 0
+		if Male1[30] > 14 || Male1[30] < 0 ; Prevent issues with OpenMouth
+			Male1[30] = 8
 		endIf
 	endIf
 	if JsonUtil.FloatListCount(File, "Male2") == 32
 		Male2 = new float[32]
 		JsonUtil.FloatListSlice(File, "Male2", Male2)
-		if Male2[30] > 14 ; Prevent issues with OpenMouth
-			Male2[30] = 0
+		if Male2[30] > 14 || Male2[30] < 0 ; Prevent issues with OpenMouth
+			Male2[30] = 8
 		endIf
 	endIf
 	if JsonUtil.FloatListCount(File, "Male3") == 32
 		Male3 = new float[32]
 		JsonUtil.FloatListSlice(File, "Male3", Male3)
-		if Male3[30] > 14 ; Prevent issues with OpenMouth
-			Male3[30] = 0
+		if Male3[30] > 14 || Male3[30] < 0 ; Prevent issues with OpenMouth
+			Male3[30] = 8
 		endIf
 	endIf
 	if JsonUtil.FloatListCount(File, "Male4") == 32
 		Male4 = new float[32]
 		JsonUtil.FloatListSlice(File, "Male4", Male4)
-		if Male4[30] > 14 ; Prevent issues with OpenMouth
-			Male4[30] = 0
+		if Male4[30] > 14 || Male4[30] < 0 ; Prevent issues with OpenMouth
+			Male4[30] = 8
 		endIf
 	endIf
 	if JsonUtil.FloatListCount(File, "Male5") == 32
 		Male5 = new float[32]
 		JsonUtil.FloatListSlice(File, "Male5", Male5)
-		if Male5[30] > 14 ; Prevent issues with OpenMouth
-			Male5[30] = 0
+		if Male5[30] > 14 || Male5[30] < 0 ; Prevent issues with OpenMouth
+			Male5[30] = 8
 		endIf
 	endIf
 
 	if JsonUtil.FloatListCount(File, "Female1") == 32
 		Female1 = new float[32]
 		JsonUtil.FloatListSlice(File, "Female1", Female1)
-		if Female1[30] > 14 ; Prevent issues with OpenMouth
-			Female1[30] = 0
+		if Female1[30] > 14 || Female1[30] < 0 ; Prevent issues with OpenMouth
+			Female1[30] = 8
 		endIf
 	endIf
 	if JsonUtil.FloatListCount(File, "Female2") == 32
 		Female2 = new float[32]
 		JsonUtil.FloatListSlice(File, "Female2", Female2)
-		if Female2[30] > 14 ; Prevent issues with OpenMouth
-			Female2[30] = 0
+		if Female2[30] > 14 || Female2[30] < 0 ; Prevent issues with OpenMouth
+			Female2[30] = 8
 		endIf
 	endIf
 	if JsonUtil.FloatListCount(File, "Female3") == 32
 		Female3 = new float[32]
 		JsonUtil.FloatListSlice(File, "Female3", Female3)
-		if Female3[30] > 14 ; Prevent issues with OpenMouth
-			Female3[30] = 0
+		if Female3[30] > 14 || Female3[30] < 0 ; Prevent issues with OpenMouth
+			Female3[30] = 8
 		endIf
 	endIf
 	if JsonUtil.FloatListCount(File, "Female4") == 32
 		Female4 = new float[32]
 		JsonUtil.FloatListSlice(File, "Female4", Female4)
-		if Female4[30] > 14 ; Prevent issues with OpenMouth
-			Female4[30] = 0
+		if Female4[30] > 14 || Female4[30] < 0 ; Prevent issues with OpenMouth
+			Female4[30] = 8
 		endIf
 	endIf
 	if JsonUtil.FloatListCount(File, "Female5") == 32
 		Female5 = new float[32]
 		JsonUtil.FloatListSlice(File, "Female5", Female5)
-		if Female5[30] > 14 ; Prevent issues with OpenMouth
-			Female5[30] = 0
+		if Female5[30] > 14 || Female5[30] < 0 ; Prevent issues with OpenMouth
+			Female5[30] = 8
 		endIf
 	endIf
 
+	if JsonUtil.FormListCount(File, "MaleEquip") == 5
+		MaleEquip = new Form[5]
+		JsonUtil.FormListSlice(File, "MaleEquip", MaleEquip)
+	endIf
+	if JsonUtil.FormListCount(File, "FemaleEquip") == 5
+		FemaleEquip = new Form[5]
+		JsonUtil.FormListSlice(File, "FemaleEquip", FemaleEquip)
+	endIf
+
+	if JsonUtil.IntListCount(File, "MaleLipFixed") == 5
+		MaleLipFixed = new int[5]
+		JsonUtil.IntListSlice(File, "MaleLipFixed", MaleLipFixed)
+	endIf
+	if JsonUtil.IntListCount(File, "FemaleLipFixed") == 5
+		FemaleLipFixed = new int[5]
+		JsonUtil.IntListSlice(File, "FemaleLipFixed", FemaleLipFixed)
+	endIf
+
 	CountPhases()
+
+	JsonUtil.Unload(File, false, false)
 
 	return true
 endFunction
@@ -761,149 +1044,3 @@ endFunction
 ; endFunction
 ; function SetPhase(int Phase, int Gender, int[] Preset)
 ; endFunction
-;Aah 0    BigAah 1
-;BMP 2    ChjSh 3
-;DST 4    Eee 5
-;Eh 6     FV 7
-;i 8      k 9
-;N 10     Oh 11
-;OohQ 12  R 13
-;Th 14    W 15
-;https://steamcommunity.com/sharedfiles/filedetails/?l=english&id=187155077
-Function SmoothSetPhoneme(Actor act, Int number, Int str_dest, float modifier = 1.0) global
-	Int t1 = MfgConsoleFunc.GetPhoneme(act, number)
-	Int t2
-	Int speed = 3
-	;quick return if same
-	if str_dest == t1
-		return
-	endif 
-	str_dest = (str_dest * modifier) as Int
-	While (t1 != str_dest)
-		t2 = (str_dest - t1) / Math.Abs(str_dest - t1) as Int
-		t1 = t1 + t2 * speed
-		If ((str_dest - t1) / t2 < 0)
-			t1 = str_dest
-		EndIf
-		MfgConsoleFunc.SetPhoneme(act, number, t1)
-	EndWhile
-EndFunction
-
-;mfg modifier
-;BlinkL 0
-;BlinkR 1
-;BrowDownL 2
-;BrownDownR 3
-;BrowInL 4
-;BrowInR 5
-;BrowUpL 6
-;BrowUpR 7
-;LookDown 8
-;LookLeft 9
-;LookRight 10
-;LookUp 11
-;SquintL 12
-;SquintR 13
-;for changing 2 values at the same time (e.g. eyes squint)
-;set -1 to mod2 if not needed 
-Function SmoothSetModifier(Actor act, Int mod1, Int mod2, Int str_dest, float strModifier = 1.0) global
-	Int speed_blink_min = 25
-	Int speed_blink_max = 60
-	Int speed_eye_move_min = 5
-	Int speed_eye_move_max = 15
-	Int speed_blink = 0
-
-	Int t1 = MfgConsoleFunc.GetModifier(act, mod1)
-	Int t2
-	Int t3
-	Int speed
-	str_dest = (str_dest * strModifier) as Int
-	If (mod1 < 2)
-		If (str_dest > 0)
-			speed_blink = Utility.RandomInt(speed_blink_min, speed_blink_max)
-			speed = speed_blink
-		Else
-			If (speed_blink > 0)
-				speed = Round(speed_blink * 0.5)
-			Else
-				speed = Round(Utility.RandomInt(speed_blink_min, speed_blink_max) * 0.5)
-			EndIf
-		EndIf
-	ElseIf (mod1 > 7 && mod1 < 12)
-		speed = Utility.RandomInt(speed_eye_move_min, speed_eye_move_max)
-	Else
-		speed = 3
-	EndIf
-	While (t1 != str_dest)
-		t2 = (str_dest - t1) / Math.Abs(str_dest - t1) as Int
-		t1 = t1 + t2 * speed
-		If ((str_dest - t1) / t2 < 0)
-			t1 = str_dest
-		EndIf
-		If (!(mod2 < 0 || mod2 > 13))
-			t3 = Utility.RandomInt(0, 1)
-			MfgConsoleFunc.SetModifier(act, mod1 * t3 + mod2 * (1 - t3), t1)
-			MfgConsoleFunc.SetModifier(act, mod2 * t3 + mod1 * (1 - t3), t1)
-		Else
-			MfgConsoleFunc.SetModifier(act, mod1, t1)
-		EndIf
-	EndWhile
-EndFunction
-
-;mfg expression
-;Sets an expression to override any other expression other systems may give this actor.
-;7 - Mood Neutral
-;0 - Dialogue Anger 8 - Mood Anger 15 - Combat Anger
-;1 - Dialogue Fear 9 - Mood Fear 16 - Combat Shout
-;2 - Dialogue Happy 10 - Mood Happy
-;3 - Dialogue Sad 11 - Mood Sad
-;4 - Dialogue Surprise 12 - Mood Surprise
-;5 - Dialogue Puzzled 13 - Mood Puzzled
-;6 - Dialogue Disgusted 14 - Mood Disgusted
-Int Function SmoothSetExpression(Actor act, Int number, Int exp_dest, int exp_value, float modifier = 1.0) global
-	int safeguard = 0
-	Int t2
-	Int speed = 2
-	exp_dest = (exp_dest * modifier) as Int
-	While (exp_value != exp_dest)
-		t2 = (exp_dest - exp_value) / Math.Abs(exp_dest - exp_value) as Int
-		exp_value = exp_value + t2 * speed
-		If ((exp_dest - exp_value) / t2 < 0)
-			exp_value = exp_dest
-		EndIf
-		act.SetExpressionOverride(number, exp_value)
-	EndWhile
-	return exp_value
-EndFunction
-
-Int Function Round(Float f) global
-	Return Math.Floor(f + 0.5)
-EndFunction
-
-Function resetMFGSmooth(Actor ac) global
-	;blinks
-	SmoothSetModifier(ac,0,1,0)
-	
-	;brows
-	SmoothSetModifier(ac,2,3,0)
-	SmoothSetModifier(ac,4,5,0)
-	SmoothSetModifier(ac,6,7,0)
-
-	;eyes
-	SmoothSetModifier(ac,8,-1,0)
-	SmoothSetModifier(ac,9,-1,0)
-	SmoothSetModifier(ac,10,-1,0)
-	SmoothSetModifier(ac,11,-1,0)
-
-	;squints
-	SmoothSetModifier(ac,12,13,0)
-	
-	;mouth
-	int p = 0
-	while (p <= 15)
-		SmoothSetPhoneme(ac, p, 0)
-		p = p + 1
-	endwhile
-	;expressions
-	SmoothSetExpression(ac, MfgConsoleFunc.GetExpressionID(ac), 0, MfgConsoleFunc.GetExpressionValue(ac))
-endfunction
