@@ -284,6 +284,7 @@ function ApplyPresetFloats(Actor ActorRef, float[] Preset) global
 	int p
 	int m
 	int value
+	int currValue
 	; MFG
 	bool IsMouthOpen = IsMouthOpen(ActorRef)
 	bool HasMFG = SexLabUtil.GetConfig().HasMFGFix
@@ -294,9 +295,17 @@ function ApplyPresetFloats(Actor ActorRef, float[] Preset) global
 		MouthScale = 200
 	EndIf
 	; Set expression
+	float currExpr = GetExpression(ActorRef, true)
+	float currExprStr = GetExpression(ActorRef, false)
+	currValue = PapyrusUtil.ClampInt((MouthScale * GetExpression(ActorRef, false)) as int, 0, 100)
 	value = PapyrusUtil.ClampInt((MouthScale * Preset[31]) as int, 0, 100)
-	If (GetExpression(ActorRef, true) != Preset[30] || GetExpression(ActorRef, false) != value as Float / 100.0) && !IsMouthOpen
-		SmoothSetExpression(ActorRef, Preset[30] as int, value)
+	if !IsMouthOpen
+		if currExpr != Preset[30]
+			SmoothSetExpression(ActorRef, currExpr as int, 0, 0)
+			SmoothSetExpression(ActorRef, Preset[30] as int, value, 0)
+		ElseIf (currExpr == Preset[30] && currExprStr != Preset[31])
+			SmoothSetExpression(ActorRef, currExpr as int, value, currValue)
+		endIf
 	endIf
 	; Set Phoneme
 	if IsMouthOpen
