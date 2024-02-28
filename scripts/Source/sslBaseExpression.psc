@@ -113,46 +113,10 @@ float function GetPhoneme(Actor ActorRef, int id) global native
 float function GetExpression(Actor ActorRef, bool getId) global native
 
 function ClearPhoneme(Actor ActorRef) global
-	bool HasMFG = SexLabUtil.GetConfig().HasMFGFix
-	int p
-	if HasMFG
-		while (p <= 15)
-			SmoothSetPhoneme(ActorRef, p, 0)
-			p = p + 1
-		endwhile
-	else
-		while p <= 15
-			ActorRef.SetExpressionPhoneme(p, 0.0)
-			p += 1
-		endWhile
-	endIf
+	resetPhonemesSmooth(ActorRef)
 endFunction
 function ClearModifier(Actor ActorRef) global
-	bool HasMFG = SexLabUtil.GetConfig().HasMFGFix
-	int i
-	if HasMFG
-		;blinks
-		SmoothSetModifier(ActorRef,0,1,0)
-	
-		;brows
-		SmoothSetModifier(ActorRef,2,3,0)
-		SmoothSetModifier(ActorRef,4,5,0)
-		SmoothSetModifier(ActorRef,6,7,0)
-
-		;eyes
-		SmoothSetModifier(ActorRef,8,-1,0)
-		SmoothSetModifier(ActorRef,9,-1,0)
-		SmoothSetModifier(ActorRef,10,-1,0)
-		SmoothSetModifier(ActorRef,11,-1,0)
-
-		;squints
-		SmoothSetModifier(ActorRef,12,13,0)
-	else
-		while i <= 13
-			ActorRef.SetExpressionModifier(i, 0.0)
-			i += 1
-		endWhile
-	endIf
+	resetModifiersSmooth(ActorRef)
 endFunction
 
 function OpenMouth(Actor ActorRef) global
@@ -172,7 +136,6 @@ function OpenMouthScaled(Actor ActorRef, float Scale = 1.0) global
 	Int i = 0
 	Int s = 0
 	Int value
-	bool HasMFG = SexLabUtil.GetConfig().HasMFGFix
 	int MouthScale = (StorageUtil.GetFloatValue(ActorRef, "SexLab.MouthScale", 1.0) * Scale * 100) as Int
 	if MouthScale < 20
 		MouthScale = 20
@@ -182,18 +145,14 @@ function OpenMouthScaled(Actor ActorRef, float Scale = 1.0) global
 	; Set expression
 	value = PapyrusUtil.ClampInt((MouthScale * (SexLabUtil.GetConfig().OpenMouthSize as float / 100.0)) as int, 0, 100)
 	if (GetExpression(ActorRef, true) as int != OpenMouthExpression || GetExpression(ActorRef, false) != value as float / 100.0)
-		SmoothSetExpression(ActorRef, OpenMouthExpression, value)
+		SmoothSetExpression(ActorRef, OpenMouthExpression, value, 0)
 	endIf
 	; Set Phoneme
 	Bool PhonemeUpdated = false
 	while i < Phonemes.length
 		value = PapyrusUtil.ClampInt((MouthScale * Phonemes[i]) as int, 0, 100)
 		if (GetPhoneme(ActorRef, i) != value as float / 100.0)
-			if HasMFG
 				SmoothSetModifier(ActorRef,0,-1,value)
-			else
-				ActorRef.SetExpressionPhoneme(i, value as float / 100.0)
-			endIf
 			PhonemeUpdated = True
 		endIf
 		if Phonemes[i] >= Phonemes[s] ; seems to be required to prevet issues
@@ -203,11 +162,7 @@ function OpenMouthScaled(Actor ActorRef, float Scale = 1.0) global
 	endWhile
 	if PhonemeUpdated
 		value = PapyrusUtil.ClampInt((MouthScale * Phonemes[s]) as int, 0, 100)
-		if HasMFG
-			SmoothSetPhoneme(ActorRef, s, value) ; Oldrim
-		else
-			ActorRef.SetExpressionPhoneme(s, value as float / 100.0) 
-		endIf
+		SmoothSetPhoneme(ActorRef, s, value)
 	endIf
 	Utility.WaitMenuMode(0.1)
 endFunction
@@ -238,13 +193,7 @@ bool function IsMouthOpen(Actor ActorRef) global
 endFunction
 
 function ClearMFG(Actor ActorRef) global
-	ActorRef.ClearExpressionOverride()
-	if SexLabUtil.GetConfig().HasMFGFix
-		resetMFGSmooth(ActorRef)
-	else
-		ClearPhoneme(ActorRef)
-		ClearModifier(ActorRef)
-	endIf
+	resetMFGSmooth(ActorRef)
 endFunction
 
 function TransitPresetFloats(Actor ActorRef, float[] FromPreset, float[] ToPreset, float Speed = 1.0, float Time = 1.0) global 
@@ -279,89 +228,24 @@ function ApplyPresetFloats(Actor ActorRef, float[] Preset) global
 	if !ActorRef || Preset.Length < 32
 		return
 	endIf
-
-	int i
-	int p
-	int m
-	int value
-	int currValue
-	; MFG
-	bool IsMouthOpen = IsMouthOpen(ActorRef)
-	bool HasMFG = SexLabUtil.GetConfig().HasMFGFix
-	int MouthScale = (StorageUtil.GetFloatValue(ActorRef, "SexLab.MouthScale", 1.0) * 100) as Int
-	if MouthScale < 20
-		MouthScale = 20
-	ElseIf MouthScale > 200
-		MouthScale = 200
+	bool bMouthOpen = IsMouthOpen(ActorRef)
+	float fMouthScale= StorageUtil.GetFloatValue(ActorRef, "SexLab.MouthScale", 1.0)
+	if fMouthScale < 0.2
+		fMouthScale = 0.2
+	ElseIf fMouthScale > 2.0
+		fMouthScale = 2.0
 	EndIf
+	int iMouthScale = (fMouthScale * 100) as Int
 	; Set expression
 	float currExpr = GetExpression(ActorRef, true)
-	float currExprStr = GetExpression(ActorRef, false)
-	currValue = PapyrusUtil.ClampInt((MouthScale * GetExpression(ActorRef, false)) as int, 0, 100)
-	value = PapyrusUtil.ClampInt((MouthScale * Preset[31]) as int, 0, 100)
-	if !IsMouthOpen
+	int currValue = PapyrusUtil.ClampInt((iMouthScale * GetExpression(ActorRef, false)) as int, 0, 100)
+	if !bMouthOpen
 		if currExpr != Preset[30]
-			SmoothSetExpression(ActorRef, currExpr as int, 0, 0)
-			SmoothSetExpression(ActorRef, Preset[30] as int, value, 0)
-		ElseIf (currExpr == Preset[30] && currExprStr != Preset[31])
-			SmoothSetExpression(ActorRef, currExpr as int, value, currValue)
+			;reduce curr expression to 0
+			SmoothSetExpression(ActorRef, currExpr as int, 0, currValue)
 		endIf
 	endIf
-	; Set Phoneme
-	if IsMouthOpen
-		i = 16 ; escape the Phoneme to prevent override the MouthOpen
-	else
-		int s = 0
-		Bool PhonemeUpdated = False
-		while p <= 15
-			value = PapyrusUtil.ClampInt((MouthScale * Preset[i]) as int, 0, 100)
-			if GetPhoneme(ActorRef, p) != value as float / 100.0
-				if HasMFG
-					SmoothSetPhoneme(ActorRef, p, (Preset[i] * 100.0) as int) ; Oldrim
-				else
-					ActorRef.SetExpressionPhoneme(p, value as float / 100.0)
-				endIf
-				PhonemeUpdated = True
-			endIf
-			if Preset[p] >= Preset[s] ; seems to be required to prevet issues
-				s = p
-			endIf
-			i += 1
-			p += 1
-		endWhile
-		if PhonemeUpdated
-			value = PapyrusUtil.ClampInt((MouthScale * Preset[s]) as int, 0, 100)
-			if HasMFG
-				SmoothSetPhoneme(ActorRef,s,value)
-			else
-				ActorRef.SetExpressionPhoneme(s, value as float / 100.0) 
-			endIf
-		endIf
-		
-	endIf
-	; Set Modifers
-	while m <= 13
-		if GetModifier(ActorRef, m) != Preset[i]
-			if HasMFG
-				;both eyes involved
-				if (m == 0 || m == 2 || m == 4 || m == 6 || m == 12)
-					if Preset[i] == Preset[i+1]
-						SmoothSetModifier(ActorRef, m, m+1, (Preset[i] * 100.0) as int)
-						i += 1
-						m += 1
-					else
-						SmoothSetModifier(ActorRef, m, -1, (Preset[i] * 100.0) as int)
-					endif 
-				else
-					SmoothSetModifier(ActorRef, m, -1, (Preset[i] * 100.0) as int)
-				endif
-			else
-				ActorRef.SetExpressionModifier(m, Preset[i]) ; is supouse to be / 100.0 already thanks SetIndex function
-			endIf
-		endif
-		i += 1
-		m += 1
-	endWhile
+	ApplyExpressionPreset(ActorRef, Preset, fMouthScale, fMouthScale, bMouthOpen)
 endFunction
 
 float[] function GetCurrentMFG(Actor ActorRef) global
