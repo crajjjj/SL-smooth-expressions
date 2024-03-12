@@ -110,7 +110,7 @@ function OpenMouth(Actor ActorRef) global
 		endIf
 		i += 1
 	endWhile
-	SmoothSetPhoneme(ActorRef, s, (Phonemes[s] * 100.0) as int) ; Oldrim
+	sslExpression_util.SmoothSetPhoneme(ActorRef, s, (Phonemes[s] * 100.0) as int) ; Oldrim
 	if (GetExpression(ActorRef, true) as int == OpenMouthExpression || GetExpression(ActorRef, false) != OpenMouthSize as float / 100.0)
 		SmoothSetExpression(ActorRef,OpenMouthExpression, OpenMouthSize, GetExpression(ActorRef,true) as Int)
 	endIf
@@ -143,7 +143,7 @@ bool function IsMouthOpen(Actor ActorRef) global
 endFunction
 
 function ClearMFG(Actor ActorRef) global
-	resetMFGSmooth(ActorRef)
+	sslExpression_util.resetMFGSmooth(ActorRef)
 endFunction
 
 function TransitPresetFloats(Actor ActorRef, float[] FromPreset, float[] ToPreset, float Speed = 1.0, float Time = 1.0) global 
@@ -178,7 +178,15 @@ function ApplyPresetFloats(Actor ActorRef, float[] Preset) global
 	if !ActorRef || Preset.Length < 32
 		return
 	endIf
-	ApplyExpressionPreset(ActorRef, Preset, IsMouthOpen(ActorRef))
+	bool bMouthOpen = IsMouthOpen(ActorRef)
+	float currExpr = GetExpression(ActorRef, true)
+	int currValue = PapyrusUtil.ClampInt((GetExpression(ActorRef, false)) as int, 0, 100)
+	if !bMouthOpen
+		if currExpr != Preset[30]
+			SmoothSetExpression(ActorRef, currExpr as int, 0, currValue)
+		endIf
+	endIf
+	ApplyExpressionPreset(ActorRef, Preset, bMouthOpen)
 endFunction
 
 
