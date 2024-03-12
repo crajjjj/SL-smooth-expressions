@@ -245,7 +245,7 @@ function ApplyPresetFloats(Actor ActorRef, float[] Preset) global
 			SmoothSetExpression(ActorRef, currExpr as int, 0, currValue)
 		endIf
 	endIf
-	ApplyExpressionPreset(ActorRef, Preset, fMouthScale, fMouthScale, bMouthOpen)
+	ApplyExpressionPreset(ActorRef, Preset, bMouthOpen, fMouthScale)
 endFunction
 
 float[] function GetCurrentMFG(Actor ActorRef) global
