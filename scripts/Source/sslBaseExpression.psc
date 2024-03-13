@@ -1,7 +1,7 @@
 scriptname sslBaseExpression extends sslBaseObject
 
 ;import PapyrusUtil
-import sslExpression_util
+
 
 ; Gender Types
 int property Male       = 0 autoreadonly
@@ -113,10 +113,10 @@ float function GetPhoneme(Actor ActorRef, int id) global native
 float function GetExpression(Actor ActorRef, bool getId) global native
 
 function ClearPhoneme(Actor ActorRef) global
-	resetPhonemesSmooth(ActorRef)
+	sslExpression_util.resetPhonemesSmooth(ActorRef)
 endFunction
 function ClearModifier(Actor ActorRef) global
-	resetModifiersSmooth(ActorRef)
+	sslExpression_util.resetModifiersSmooth(ActorRef)
 endFunction
 
 function OpenMouth(Actor ActorRef) global
@@ -145,14 +145,14 @@ function OpenMouthScaled(Actor ActorRef, float Scale = 1.0) global
 	; Set expression
 	value = PapyrusUtil.ClampInt((MouthScale * (SexLabUtil.GetConfig().OpenMouthSize as float / 100.0)) as int, 0, 100)
 	if (GetExpression(ActorRef, true) as int != OpenMouthExpression || GetExpression(ActorRef, false) != value as float / 100.0)
-		SmoothSetExpression(ActorRef, OpenMouthExpression, value, 0)
+		sslExpression_util.SmoothSetExpression(ActorRef, OpenMouthExpression, value, 0)
 	endIf
 	; Set Phoneme
 	Bool PhonemeUpdated = false
 	while i < Phonemes.length
 		value = PapyrusUtil.ClampInt((MouthScale * Phonemes[i]) as int, 0, 100)
 		if (GetPhoneme(ActorRef, i) != value as float / 100.0)
-				SmoothSetModifier(ActorRef,0,-1,value)
+			sslExpression_util.SmoothSetModifier(ActorRef,0,-1,value)
 			PhonemeUpdated = True
 		endIf
 		if Phonemes[i] >= Phonemes[s] ; seems to be required to prevet issues
@@ -162,14 +162,14 @@ function OpenMouthScaled(Actor ActorRef, float Scale = 1.0) global
 	endWhile
 	if PhonemeUpdated
 		value = PapyrusUtil.ClampInt((MouthScale * Phonemes[s]) as int, 0, 100)
-		SmoothSetPhoneme(ActorRef, s, value)
+		sslExpression_util.SmoothSetPhoneme(ActorRef, s, value)
 	endIf
 	Utility.WaitMenuMode(0.1)
 endFunction
 
 function CloseMouth(Actor ActorRef) global
 	ClearPhoneme(ActorRef)
-	SmoothSetExpression(ActorRef,7,70, GetExpression(ActorRef,true) as Int)
+	sslExpression_util.SmoothSetExpression(ActorRef,7,70, GetExpression(ActorRef,true) as Int)
 	Utility.WaitMenuMode(0.1)
 endFunction
 
@@ -193,7 +193,7 @@ bool function IsMouthOpen(Actor ActorRef) global
 endFunction
 
 function ClearMFG(Actor ActorRef) global
-	resetMFGSmooth(ActorRef)
+	sslExpression_util.resetMFGSmooth(ActorRef)
 endFunction
 
 function TransitPresetFloats(Actor ActorRef, float[] FromPreset, float[] ToPreset, float Speed = 1.0, float Time = 1.0) global 
@@ -242,10 +242,10 @@ function ApplyPresetFloats(Actor ActorRef, float[] Preset) global
 	if !bMouthOpen
 		if currExpr != Preset[30]
 			;reduce curr expression to 0
-			SmoothSetExpression(ActorRef, currExpr as int, 0, currValue)
+			sslExpression_util.SmoothSetExpression(ActorRef, currExpr as int, 0, currValue)
 		endIf
 	endIf
-	ApplyExpressionPreset(ActorRef, Preset, bMouthOpen, fMouthScale)
+	sslExpression_util.ApplyExpressionPreset(ActorRef, Preset, bMouthOpen, fMouthScale)
 endFunction
 
 float[] function GetCurrentMFG(Actor ActorRef) global

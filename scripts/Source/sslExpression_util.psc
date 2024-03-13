@@ -1,25 +1,8 @@
 Scriptname sslExpression_util Hidden
 
 String Function GetVersionString() Global
-    Return "2.0.0 SLPlus"
+    Return "3.0.0 SLPlus"
 EndFunction
-
-int Function getSmoothDelay() global
-	return 10
-endfunction
-int Function getSmoothSpeed() global
-	return 5
-endfunction
-int Function getHardDelay() global
-	return 0
-endfunction
-int Function getHardSpeed() global
-	return 100
-endfunction
-
-
-
-
 
 
 ;mfg modifier
@@ -44,17 +27,10 @@ Function SmoothSetModifier(Actor act, Int mod1, Int mod2, Int str_dest, float st
 	mod1 = PapyrusUtil.ClampInt(mod1, 0, 13)
 	mod2 = PapyrusUtil.ClampInt(mod1, -1, 13)
 	str_dest = (str_dest * strModifier) as Int
-	MfgConsoleFunc.SetModifier(act,mod1,str_dest)
+	MfgConsoleFuncExt.SetModifier(act,mod1,str_dest, 1)
 	if mod2!= -1
-		MfgConsoleFunc.SetModifier(act,mod2,str_dest)
+		MfgConsoleFuncExt.SetModifier(act,mod2,str_dest, 1)
 	endif
-	;PyramidUtils.SetPhonemeModifierSmooth(act, 1, mod1, mod2, str_dest, getSmoothSpeed(), getSmoothDelay())
-EndFunction
-Function SetModifier(Actor act, Int mod1, Int str_dest, float strModifier = 1.0) global
-	str_dest = (str_dest * strModifier) as Int
-	mod1 = PapyrusUtil.ClampInt(mod1, 0, 13)
-	MfgConsoleFunc.SetModifier(act,mod1,str_dest)
-	;PyramidUtils.SetPhonemeModifierSmooth(act, 1, mod1, -1, str_dest, getHardSpeed(), getHardDelay())
 EndFunction
 ;Aah 0    BigAah 1
 ;BMP 2    ChjSh 3
@@ -65,21 +41,14 @@ EndFunction
 ;OohQ 12  R 13
 ;Th 14    W 15
 ;https://steamcommunity.com/sharedfiles/filedetails/?l=english&id=187155077
-Function SmoothSetPhoneme(Actor act, Int number, Int str_dest, float modifier = 1.0) global
+Function SmoothSetPhoneme(Actor act, Int id, Int str_dest, float modifier = 1.0) global
 	str_dest = (str_dest * modifier) as Int
-	number = PapyrusUtil.ClampInt(number, 0, 15)
-	PyramidUtils.SetPhonemeModifierSmooth(act, 0, number, -1, str_dest, getSmoothSpeed(), getSmoothDelay())
-EndFunction
-Function SetPhoneme(Actor act, Int mod1, Int str_dest, float modifier = 1.0) global
-	str_dest = (str_dest * modifier) as Int
-	mod1 = PapyrusUtil.ClampInt(mod1, 0, 15)
-	MfgConsoleFunc.SetPhoneme(act,mod1,str_dest)
-	;PyramidUtils.SetPhonemeModifierSmooth(act, 0, mod1, -1, str_dest, getHardSpeed(), getHardDelay())
+	id = PapyrusUtil.ClampInt(id, 0, 15)
+	MfgConsoleFuncExt.SetPhoneme(act,id,str_dest)
 EndFunction
 
-Function ApplyExpressionPreset(Actor akActor, float[] expression, bool openMouth, float fMouthScale) global
-	MfgConsoleFunc.ApplyExpressionPreset(akActor, expression, openMouth, 0, 1, 1, fMouthScale) 
-	; PyramidUtils.ApplyExpressionPreset(akActor, expression, openMouth, 0, 1, 1, 1, getSmoothSpeed(), getSmoothDelay())
+Function ApplyExpressionPreset(Actor akActor, float[] expression, bool openMouth,float fMouthScale) global
+	MfgConsoleFuncExt.ApplyExpressionPreset(akActor, expression, openMouth, 0, 1, 1, fMouthScale, 0.75)
 EndFunction
 
 ;mfg expression
@@ -95,27 +64,19 @@ EndFunction
 ;aiCurrentStrength can be used if current expression is the same or we want to start with an offset
 Function SmoothSetExpression(Actor act, Int aiMood, Int aiStrength, int aiCurrentStrength, float aiModifier = 1.0) global
 	aiMood = PapyrusUtil.ClampInt(aiMood, 0, 16)
-	MfgConsoleFunc.SetExpression(act,aiMood, aiStrength)
-	;PyramidUtils.SetExpressionSmooth(act, aiMood, aiStrength, aiCurrentStrength, aiModifier, getSmoothSpeed(), getSmoothDelay())
+	MfgConsoleFuncExt.SetExpression(act, aiMood, aiStrength)
 EndFunction
 
-Function resetMFG(Actor act) global
-	MfgConsoleFunc.ResetPhonemeModifier(act)
-	;PyramidUtils.SetPhonemeModifierSmooth(act, -1, 0, -1, 0, 0, 0)
-endfunction
-
 Function resetMFGSmooth(Actor ac) global
-	MfgConsoleFunc.ResetMFGSmooth(ac, -1)
-	;PyramidUtils.ResetMFGSmooth(ac,-1, getSmoothSpeed(),getSmoothDelay())
+	MfgConsoleFuncExt.ResetMFG(ac)
 endfunction
 Function resetPhonemesSmooth(Actor ac) global
-	MfgConsoleFunc.ResetMFGSmooth(ac, 0)
-	;PyramidUtils.ResetMFGSmooth(ac, 0, getSmoothSpeed(),getSmoothDelay())
+	MfgConsoleFuncExt.resetPhonemes(ac)
 endfunction
 Function resetModifiersSmooth(Actor ac) global
-	MfgConsoleFunc.ResetMFGSmooth(ac, 1)
-	;PyramidUtils.ResetMFGSmooth(ac, 1, getSmoothSpeed(),getSmoothDelay())
+	MfgConsoleFuncExt.resetModifiers(ac)
 endfunction
+
 
 
 
