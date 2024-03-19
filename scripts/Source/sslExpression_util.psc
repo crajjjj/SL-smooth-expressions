@@ -48,7 +48,8 @@ Function SmoothSetPhoneme(Actor act, Int id, Int str_dest, float modifier = 1.0)
 EndFunction
 
 Function ApplyExpressionPreset(Actor akActor, float[] expression, bool openMouth) global
-	MfgConsoleFuncExt.ApplyExpressionPresetSmooth(akActor, expression, openMouth)
+	float randomSpeed= Utility.RandomFloat(0.65, 1.0)
+	MfgConsoleFuncExt.ApplyExpressionPresetSmooth(akActor, expression, openMouth, 0, 1, 1, 1, randomSpeed)
 EndFunction
 
 ;mfg expression
