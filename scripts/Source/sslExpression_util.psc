@@ -1,7 +1,7 @@
 Scriptname sslExpression_util Hidden
 
 String Function GetVersionString() Global
-    Return "3.0.0 SLPlus"
+    Return "3.0.1 SLPlus"
 EndFunction
 
 
@@ -48,7 +48,8 @@ Function SmoothSetPhoneme(Actor act, Int id, Int str_dest, float modifier = 1.0)
 EndFunction
 
 Function ApplyExpressionPreset(Actor akActor, float[] expression, bool openMouth,float fMouthScale) global
-	MfgConsoleFuncExt.ApplyExpressionPreset(akActor, expression, openMouth, 0, 1, 1, fMouthScale, 0.75)
+	float randomSpeed = Utility.RandomFloat(0.65, 1.0)
+	MfgConsoleFuncExt.ApplyExpressionPreset(akActor, expression, openMouth, 0, 1, 1, fMouthScale, randomSpeed)
 EndFunction
 
 ;mfg expression
