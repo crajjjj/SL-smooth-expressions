@@ -112,14 +112,14 @@ function OpenMouth(Actor ActorRef) global
 	endWhile
 	sslExpression_util.SmoothSetPhoneme(ActorRef, s, (Phonemes[s] * 100.0) as int) ; Oldrim
 	if (GetExpression(ActorRef, true) as int == OpenMouthExpression || GetExpression(ActorRef, false) != OpenMouthSize as float / 100.0)
-		SmoothSetExpression(ActorRef,OpenMouthExpression, OpenMouthSize, GetExpression(ActorRef,true) as Int)
+		sslExpression_util.SmoothSetExpression(ActorRef, OpenMouthExpression, OpenMouthSize)
 	endIf
 	Utility.WaitMenuMode(0.1)
 endFunction
 
 function CloseMouth(Actor ActorRef) global
 	ClearPhoneme(ActorRef)
-	SmoothSetExpression(ActorRef,7,70, GetExpression(ActorRef,true) as Int)
+	sslExpression_util.SmoothSetExpression(ActorRef,7,70)
 	Utility.WaitMenuMode(0.1)
 endFunction
 

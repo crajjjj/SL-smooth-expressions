@@ -1,7 +1,7 @@
 Scriptname sslExpression_util Hidden
 
 String Function GetSLSmoothVersionString() global
-    Return "3.0.0"
+    Return "3.0.1"
 EndFunction
 
 
@@ -63,7 +63,7 @@ EndFunction
 ;5 - Dialogue Puzzled 13 - Mood Puzzled
 ;6 - Dialogue Disgusted 14 - Mood Disgusted
 ;aiCurrentStrength can be used if current expression is the same or we want to start with an offset
-Function SmoothSetExpression(Actor act, Int aiMood, Int aiStrength, int aiCurrentStrength, float aiModifier = 1.0) global
+Function SmoothSetExpression(Actor act, Int aiMood, Int aiStrength, float aiModifier = 1.0) global
 	aiMood = PapyrusUtil.ClampInt(aiMood, 0, 16)
 	MfgConsoleFuncExt.SetExpression(act, aiMood, aiStrength)
 EndFunction

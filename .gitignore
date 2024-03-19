@@ -30,7 +30,6 @@ scripts/sslAnimationFactory.pex
 scripts/sslAnimationSlots.pex
 scripts/sslBaseAnimation.pex
 scripts/sslBaseObject.pex
-scripts/sslBaseVoice.pex
 scripts/sslBenchmark.pex
 scripts/sslConfigMenu.pex
 scripts/sslCreatureAnimationDefaults.pex
@@ -72,7 +71,6 @@ scripts/Source/sslAnimationFactory.psc
 scripts/Source/sslAnimationSlots.psc
 scripts/Source/sslBaseAnimation.psc
 scripts/Source/sslBaseObject.psc
-scripts/Source/sslBaseVoice.psc
 scripts/Source/sslBenchmark.psc
 scripts/Source/sslConfigMenu.psc
 scripts/Source/sslCreatureAnimationDefaults.psc
