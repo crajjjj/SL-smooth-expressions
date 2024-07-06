@@ -1,7 +1,7 @@
 Scriptname sslExpression_util Hidden
 
 String Function GetVersionString() Global
-    Return "3.0.1 SLPlus"
+    Return "3.0.2 SLPlus"
 EndFunction
 
 

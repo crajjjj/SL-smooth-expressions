@@ -152,7 +152,7 @@ function OpenMouthScaled(Actor ActorRef, float Scale = 1.0) global
 	while i < Phonemes.length
 		value = PapyrusUtil.ClampInt((MouthScale * Phonemes[i]) as int, 0, 100)
 		if (GetPhoneme(ActorRef, i) != value as float / 100.0)
-			sslExpression_util.SmoothSetModifier(ActorRef,0,-1,value)
+			sslExpression_util.SmoothSetPhoneme(ActorRef,0,value)
 			PhonemeUpdated = True
 		endIf
 		if Phonemes[i] >= Phonemes[s] ; seems to be required to prevet issues
