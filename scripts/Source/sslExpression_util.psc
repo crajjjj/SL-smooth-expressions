@@ -1,7 +1,7 @@
 Scriptname sslExpression_util Hidden
 
 String Function GetSLSmoothVersionString() global
-    Return "3.0.1"
+    Return "3.0.2"
 EndFunction
 
 
